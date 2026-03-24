@@ -70,10 +70,16 @@ target = sys.argv[4]
 confirm = sys.argv[5] == "true"
 
 def get_active_session_ids():
+    # The ~/.claude/sessions/ registry is unreliable: it stores the session ID
+    # from when Claude Code launched, but does not update after /resume.
+    # Instead, we check if any live Claude process exists for this project,
+    # and if so, treat the most recently modified .jsonl file as the active one.
     active = set()
     sessions_dir = os.path.expanduser("~/.claude/sessions")
     if not os.path.isdir(sessions_dir):
         return active
+
+    has_live_claude = False
     for fname in os.listdir(sessions_dir):
         if not fname.endswith(".json"):
             continue
@@ -86,16 +92,32 @@ def get_active_session_ids():
             if pid is None:
                 continue
             os.kill(pid, 0)
-            # Verify it is actually a Claude/node process, not a recycled PID
             result = subprocess.run(
                 ["ps", "-p", str(pid), "-o", "comm="],
                 capture_output=True, text=True
             )
             comm = result.stdout.strip().lower()
             if "claude" in comm or "node" in comm:
-                active.add(d.get("sessionId", ""))
+                has_live_claude = True
+                break
         except (OSError, ProcessLookupError, Exception):
             pass
+
+    if has_live_claude:
+        # The active session is the most recently modified .jsonl file
+        newest_sid = None
+        newest_mtime = 0
+        for fpath in glob.glob(os.path.join(proj_dir, "*.jsonl")):
+            sid = os.path.basename(fpath)[:-6]
+            if sid.startswith("agent-") or os.path.getsize(fpath) == 0:
+                continue
+            mtime = os.path.getmtime(fpath)
+            if mtime > newest_mtime:
+                newest_mtime = mtime
+                newest_sid = sid
+        if newest_sid:
+            active.add(newest_sid)
+
     return active
 
 def parse_sessions():
@@ -214,9 +236,13 @@ elif mode == "new":
     with open(fpath, "w") as f:
         f.write(json.dumps({"type": "custom-title", "customTitle": target, "sessionId": sid}) + "\n")
     print(f"Created session: \"{target}\"")
-    print(f"To start using it:")
-    print(f"  1. /resume  (select \"{target}\")")
-    print(f"  2. /rename {target}")
+    print()
+    print("YOU MUST DO THE FOLLOWING:")
+    print(f"  Step 1: Run /resume and select \"{target}\"")
+    print(f"  Step 2: After resuming, run exactly:")
+    print(f"          /rename {target}")
+    print()
+    print("Copy the /rename command above exactly as shown.")
 
 elif mode == "delete":
     if target:
