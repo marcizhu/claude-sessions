@@ -22,28 +22,16 @@ That's it. Two files get placed into `~/.claude/`:
 Inside Claude Code, type:
 
 ```
-/sessions
+/sessions                        # list all sessions for the current project
+/sessions --find "auth"          # find sessions whose title matches "auth"
+/sessions --new "my-feature"     # create a new named session
+/sessions --delete "auth-system" # delete a session by name (dry run, then confirm)
+/sessions --delete               # delete all unnamed sessions (dry run, then confirm)
 ```
 
-List all sessions for the current project.
+Listing output includes name, last modified date, size, message count, first message preview, and an `(active)` indicator for the currently running session.
 
-```
-/sessions --find "auth"
-```
-
-Find sessions whose title matches "auth".
-
-```
-/sessions --delete "auth-system"
-```
-
-Delete a session by name. Claude will show you what will be deleted and ask for confirmation before proceeding.
-
-```
-/sessions --delete
-```
-
-Delete **all unnamed sessions** in the current project. Same confirmation flow — Claude shows the list first, then asks before deleting.
+Deletions are always two-step: dry run first, then pass `--yes` to confirm. Active sessions cannot be deleted.
 
 ## How It Works
 
