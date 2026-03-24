@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 exec python3 -c '
-import json, os, sys, glob, shutil, uuid
+import json, os, sys, glob, shutil, uuid, subprocess
 from datetime import datetime
 
 proj_dir = sys.argv[1]
@@ -86,7 +86,14 @@ def get_active_session_ids():
             if pid is None:
                 continue
             os.kill(pid, 0)
-            active.add(d.get("sessionId", ""))
+            # Verify it is actually a Claude/node process, not a recycled PID
+            result = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "comm="],
+                capture_output=True, text=True
+            )
+            comm = result.stdout.strip().lower()
+            if "claude" in comm or "node" in comm:
+                active.add(d.get("sessionId", ""))
         except (OSError, ProcessLookupError, Exception):
             pass
     return active
@@ -207,7 +214,9 @@ elif mode == "new":
     with open(fpath, "w") as f:
         f.write(json.dumps({"type": "custom-title", "customTitle": target, "sessionId": sid}) + "\n")
     print(f"Created session: \"{target}\"")
-    print(f"Use /resume to switch to it.")
+    print(f"To start using it:")
+    print(f"  1. /resume  (select \"{target}\")")
+    print(f"  2. /rename {target}")
 
 elif mode == "delete":
     if target:
